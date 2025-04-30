@@ -1,0 +1,4 @@
+import ServiceInstallAndRun
+
+
+serviceInstall.main()
