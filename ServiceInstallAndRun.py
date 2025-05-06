@@ -1,11 +1,14 @@
 import ctypes
 import sys
 import subprocess
+import win32con
 import win32service
 import time
 import os
+from win32com.shell import shell
 
 ultraVnc_exe_path = f"{os.path.dirname(os.path.abspath(__file__))}{os.sep}x64{os.sep}winvnc.exe"
+
 
 def is_admin():
     """检查管理员权限"""
@@ -13,6 +16,16 @@ def is_admin():
         return ctypes.windll.shell32.IsUserAnAdmin()
     except:
         return False
+
+
+def run_as_admin():
+    lpApplicationName = sys.executable
+    lpParameters = __file__
+
+    shell.ShellExecuteEx(lpFile=lpApplicationName,
+                         lpParameters=lpParameters,
+                         lpVerb='runas',
+                         nShow=win32con.SW_SHOW)
 
 
 def check_service_status(service_name):
@@ -76,14 +89,50 @@ def ensure_service_running(service_name):
         return False
 
 
+def allow_pass_firewall():
+    # 设置程序路径
+    APP_PATH = os.path.dirname(os.path.realpath(__file__)) + os.sep + "x64" + os.sep + "winvnc.exe"
+    RULE_NAME_IN = f"Allow Inbound for UltraVNC_Server"
+    RULE_NAME_OUT = f"Allow Outbound for UltraVNC_Server"
+
+    in_status = False
+    out_status = False
+
+    # 添加入站规则
+    try:
+        subprocess.run(
+            f'netsh advfirewall firewall add rule name="{RULE_NAME_IN}" dir=in action=allow program="{APP_PATH}" enable=yes',
+            check=True,
+            shell=True
+        )
+        print(f"入站规则已创建：{RULE_NAME_IN}")
+        in_status = True
+    except subprocess.CalledProcessError as e:
+        print(f"入站规则创建失败：{e}")
+
+    # 添加出站规则
+    try:
+        subprocess.run(
+            f'netsh advfirewall firewall add rule name="{RULE_NAME_OUT}" dir=out action=allow program="{APP_PATH}" enable=yes',
+            check=True,
+            shell=True
+        )
+        print(f"出站规则已创建：{RULE_NAME_OUT}")
+        out_status = True
+    except subprocess.CalledProcessError as e:
+        print(f"出站规则创建失败：{e}")
+    return in_status, out_status
+
+
 def main():
     SERVICE_NAME = "uvnc_service"
 
     # 提权检测
     if not is_admin():
-        ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, __file__, None, 1)
-        # sys.exit()
-
+        run_as_admin()
+        sys.exit()
+    else:
+        print("is admin")
     # 服务状态检测
     exists, running = check_service_status(SERVICE_NAME)
 
@@ -102,6 +151,11 @@ def main():
         print("服务未运行，尝试启动...")
         if not ensure_service_running(SERVICE_NAME):
             print("错误：服务启动失败，请手动检查")
+
+    if all(allow_pass_firewall()):
+        print("防火墙规则创建成功")
+    else:
+        print("防火墙规则创建失败，请手动创建")
 
 
 if __name__ == "__main__":
