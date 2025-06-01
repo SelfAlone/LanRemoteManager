@@ -59,7 +59,7 @@
        <property name="frameShadow">
         <enum>QFrame::Shadow::Raised</enum>
        </property>
-       <widget class="QLabel" name="label">
+       <widget class="QLabel" name="full_name">
         <property name="geometry">
          <rect>
           <x>10</x>
