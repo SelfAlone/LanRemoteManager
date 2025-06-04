@@ -3,8 +3,9 @@ import sys
 import ServiceInstallAndRun
 import GetClientInfo
 from main_ui import Ui_MainWindow
-from PySide6.QtWidgets import QApplication, QMainWindow, QLabel, QTableWidgetItem
-from PySide6.QtCore import QTimer, QDateTime, Qt, QThread, Signal, Slot
+from EditDialog_ui import Ui_EditDialog
+from PySide6.QtWidgets import QApplication, QMainWindow, QLabel, QTableWidgetItem, QDialog, QMessageBox
+from PySide6.QtCore import QTimer, QDateTime, Qt, QThread, Signal, Slot, QProcess
 from PySide6.QtSql import QSqlDatabase, QSqlQuery
 
 
@@ -60,15 +61,61 @@ class DatabaseWorker(QThread):
         self.query_queue.append(query_str)
 
 
-class FuncQLabel(QLabel):
-    def __init__(self):
-        super().__init__()
-        self.setText("<a href='连接'><font color=blue>连接</font></a> | <a href='编辑'><font color=blue>编辑</font></a>")
-        self.setAlignment(Qt.AlignCenter)
-        self.linkActivated.connect(lambda x: self.click_link(x))
+class EditDialog(QDialog, Ui_EditDialog):
+    def __init__(self, table):
+        super(EditDialog, self).__init__()
+        self.setupUi(self)
+        self.clientRecordTable = table
 
-    def click_link(self, string):
-        print(f"{string}")
+        name = self.clientRecordTable.item(self.clientRecordTable.currentRow(), 0).text()
+        computer_name = self.clientRecordTable.item(self.clientRecordTable.currentRow(), 2).text()
+        ip = self.clientRecordTable.item(self.clientRecordTable.currentRow(), 3).text()
+        note = self.clientRecordTable.item(self.clientRecordTable.currentRow(), 6).text()
+        self.record = [name, computer_name, ip, note]
+
+        self.NameEdit.setText(name)
+        self.ComputerEdit.setText(computer_name)
+        self.IPEdit.setText(ip)
+        self.noteEdit.setText(note)
+        self.new_record = []
+
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.close)
+
+    def accept(self):
+        self.new_record = [self.NameEdit.text(), self.ComputerEdit.text(), self.IPEdit.text(), self.noteEdit.toPlainText()]
+        if self.new_record == self.record:
+            QMessageBox.information(self, "信息", "未对记录做出修改...", QMessageBox.Ok)
+        else:
+            pass
+
+
+class FuncQLabel(QLabel):
+    def __init__(self, table):
+        super().__init__()
+        self.ClientRecordTable = table
+        self.setText(
+            "<a href='连接'><font color=blue>连接</font></a> | <a href='编辑'><font color=blue>编辑</font></a>")
+        self.setAlignment(Qt.AlignCenter)
+        self.linkActivated.connect(self.click_link)
+
+    def click_link(self, key):
+        if key == "连接":
+            vnc_process = QProcess()
+            vnc_path = r".\x64\vncviewer.exe"
+            ip = self.ClientRecordTable.item(self.ClientRecordTable.currentRow(), 3).text()
+            args = [
+                f"{ip}",
+                "-password",
+                "805635"
+            ]
+            vnc_process.setProgram(vnc_path)
+            vnc_process.setArguments(args)
+            vnc_process.startDetached()
+        if key == "编辑":
+            edit_dialog = EditDialog(self.ClientRecordTable)
+            edit_dialog.show()
+            edit_dialog.exec()
 
 
 class MainWindow(QMainWindow, Ui_MainWindow):
@@ -96,8 +143,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.worker.error_occurred.connect(self.show_error)
         self.worker.start()
 
-        self.actionoff.triggered.connect(lambda: self.worker.stop())
-        self.pushButton.clicked.connect(lambda: self.send_query_to_worker())
+        self.actionoff.triggered.connect(self.worker.stop)
+        self.pushButton.clicked.connect(self.send_query_to_worker)
+        self.lineEdit.returnPressed.connect(self.send_query_to_worker)
         self.ClientRecordTable.itemClicked.connect(lambda x: self.statusbar.showMessage(
             f"坐标({self.ClientRecordTable.row(x)},{self.ClientRecordTable.column(x)})", 2000))
 
@@ -118,13 +166,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def send_query_to_worker(self):
         query_str = self.lineEdit.text()
         if query_str:
-            query_str = ("SELECT full_name, login_user, computer_name, ip_address, mac_address, last_login, "
-                         "client_note FROM ClientInfo LIMIT 10")
+            query_str = ("SELECT Name, LoginUserName, ComputerName, ComputerIP, "
+                         "ComputerMAC, StartTime, Tab FROM ClientInfo "
+                         f"WHERE Name LIKE '%{query_str}%' or LoginUserName LIKE '%{query_str}%' "
+                         f"or ComputerName LIKE '%{query_str}%' or ComputerIP LIKE '%{query_str}%' "
+                         f"or ComputerMAC LIKE '%{query_str}%' or Tab LIKE '%{query_str}%'")
             self.lineEdit.clear()
             self.worker.receive_query(query_str)  # 发送查询请求
         else:
-            query_str = ("SELECT full_name, login_user, computer_name, ip_address, mac_address, last_login, "
-                         "client_note FROM ClientInfo")
+            query_str = ("SELECT Name, LoginUserName, ComputerName, ComputerIP, "
+                         "ComputerMAC, StartTime, Tab FROM ClientInfo")
             self.worker.receive_query(query_str)
 
     def update_table(self, results):
@@ -133,7 +184,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         for row, data in enumerate(results):
             for col, value in enumerate(data):
                 self.ClientRecordTable.setItem(row, col, QTableWidgetItem(value))
-            self.ClientRecordTable.setCellWidget(row, 7, FuncQLabel())
+            self.ClientRecordTable.setCellWidget(row, 7, FuncQLabel(self.ClientRecordTable))
+        self.ClientRecordTable.resizeColumnsToContents()
 
     def show_error(self, error_msg):
         self.statusbar.showMessage(f"错误: {error_msg}", 5000)
