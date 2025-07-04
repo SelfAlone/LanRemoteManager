@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'main-1.ui'
+## Form generated from reading UI file 'main.ui'
 ##
 ## Created by: Qt User Interface Compiler version 6.8.2
 ##
@@ -76,8 +76,10 @@ class Ui_MainWindow(object):
         self.listWidget = QListWidget(self.HistoryTab)
         self.listWidget.setObjectName(u"listWidget")
         self.listWidget.setMinimumSize(QSize(150, 0))
-        self.listWidget.setMovement(QListView.Movement.Snap)
+        self.listWidget.setMovement(QListView.Movement.Static)
         self.listWidget.setFlow(QListView.Flow.TopToBottom)
+        self.listWidget.setLayoutMode(QListView.LayoutMode.SinglePass)
+        self.listWidget.setSpacing(2)
         self.listWidget.setViewMode(QListView.ViewMode.ListMode)
 
         self.verticalLayout_2.addWidget(self.listWidget)
@@ -89,12 +91,18 @@ class Ui_MainWindow(object):
         self.verticalLayout_3 = QVBoxLayout(self.SessionTab)
         self.verticalLayout_3.setObjectName(u"verticalLayout_3")
         self.treeWidget = QTreeWidget(self.SessionTab)
+        icon6 = QIcon(QIcon.fromTheme(QIcon.ThemeIcon.FolderOpen))
+        __qtreewidgetitem = QTreeWidgetItem()
+        __qtreewidgetitem.setIcon(0, icon6);
+        self.treeWidget.setHeaderItem(__qtreewidgetitem)
         self.treeWidget.setObjectName(u"treeWidget")
+        self.treeWidget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.treeWidget.setAutoExpandDelay(-1)
 
         self.verticalLayout_3.addWidget(self.treeWidget)
 
-        icon6 = QIcon(QIcon.fromTheme(QIcon.ThemeIcon.MailSend))
-        self.tabWidget_2.addTab(self.SessionTab, icon6, "")
+        icon7 = QIcon(QIcon.fromTheme(QIcon.ThemeIcon.MailSend))
+        self.tabWidget_2.addTab(self.SessionTab, icon7, "")
 
         self.verticalLayout.addWidget(self.tabWidget_2)
 
@@ -301,8 +309,8 @@ class Ui_MainWindow(object):
 
         self.gridLayout.addWidget(self.label_6, 4, 0, 1, 4)
 
-        icon7 = QIcon(QIcon.fromTheme(QIcon.ThemeIcon.GoHome))
-        self.tabWidget.addTab(self.HomeTab, icon7, "")
+        icon8 = QIcon(QIcon.fromTheme(QIcon.ThemeIcon.GoHome))
+        self.tabWidget.addTab(self.HomeTab, icon8, "")
         self.SearchTab = QWidget()
         self.SearchTab.setObjectName(u"SearchTab")
         self.verticalLayout_4 = QVBoxLayout(self.SearchTab)
@@ -324,11 +332,11 @@ class Ui_MainWindow(object):
 
         self.pushButton = QPushButton(self.SearchTab)
         self.pushButton.setObjectName(u"pushButton")
-        self.pushButton.setEnabled(False)
+        self.pushButton.setEnabled(True)
         self.pushButton.setMinimumSize(QSize(25, 25))
         self.pushButton.setMaximumSize(QSize(25, 25))
-        icon8 = QIcon(QIcon.fromTheme(QIcon.ThemeIcon.SystemSearch))
-        self.pushButton.setIcon(icon8)
+        icon9 = QIcon(QIcon.fromTheme(QIcon.ThemeIcon.SystemSearch))
+        self.pushButton.setIcon(icon9)
 
         self.horizontalLayout_2.addWidget(self.pushButton)
 
@@ -368,12 +376,12 @@ class Ui_MainWindow(object):
 
         self.verticalLayout_4.addWidget(self.ClientRecordTable)
 
-        self.tabWidget.addTab(self.SearchTab, icon8, "")
+        self.tabWidget.addTab(self.SearchTab, icon9, "")
 
         self.horizontalLayout.addWidget(self.tabWidget)
 
-        self.horizontalLayout.setStretch(0, 1)
-        self.horizontalLayout.setStretch(1, 9)
+        self.horizontalLayout.setStretch(0, 2)
+        self.horizontalLayout.setStretch(1, 8)
         MainWindow.setCentralWidget(self.centralwidget)
         self.statusbar = QStatusBar(MainWindow)
         self.statusbar.setObjectName(u"statusbar")
@@ -408,7 +416,8 @@ class Ui_MainWindow(object):
         self.retranslateUi(MainWindow)
         self.actionoff.triggered.connect(MainWindow.close)
 
-        self.tabWidget_2.setCurrentIndex(0)
+        self.tabWidget_2.setCurrentIndex(1)
+        self.listWidget.setCurrentRow(-1)
         self.tabWidget.setCurrentIndex(0)
 
 
@@ -439,19 +448,21 @@ class Ui_MainWindow(object):
 #endif // QT_CONFIG(tooltip)
         self.LeftSearchEdit.setPlaceholderText(QCoreApplication.translate("MainWindow", u"\u641c\u7d22...", None))
         self.tabWidget_2.setTabText(self.tabWidget_2.indexOf(self.HistoryTab), QCoreApplication.translate("MainWindow", u"\u5386\u53f2", None))
+        ___qtreewidgetitem = self.treeWidget.headerItem()
+        ___qtreewidgetitem.setText(0, QCoreApplication.translate("MainWindow", u"\u7528\u6237\u4f1a\u8bdd", None));
         self.tabWidget_2.setTabText(self.tabWidget_2.indexOf(self.SessionTab), QCoreApplication.translate("MainWindow", u"\u4f1a\u8bdd", None))
         self.label_11.setText(QCoreApplication.translate("MainWindow", u"\u8ba1\u7b97\u673a\u540d", None))
-        self.ClientNameLabel.setText(QCoreApplication.translate("MainWindow", u"TextLabel", None))
+        self.ClientNameLabel.setText("")
         self.label_3.setText("")
         self.label_7.setText(QCoreApplication.translate("MainWindow", u"IP\u5730\u5740", None))
-        self.IpLabel.setText(QCoreApplication.translate("MainWindow", u"TextLabel", None))
+        self.IpLabel.setText("")
         self.label_9.setText(QCoreApplication.translate("MainWindow", u"MAC\u5730\u5740", None))
-        self.MacLabel.setText(QCoreApplication.translate("MainWindow", u"TextLabel", None))
-        self.FullNameLabel.setText(QCoreApplication.translate("MainWindow", u"FullName", None))
+        self.MacLabel.setText("")
+        self.FullNameLabel.setText("")
         self.label_8.setText("")
-        self.TimeLabel.setText(QCoreApplication.translate("MainWindow", u"2099-09-29 23:59:59", None))
+        self.TimeLabel.setText("")
         self.label_10.setText(QCoreApplication.translate("MainWindow", u"\u767b\u9646\u8d26\u53f7", None))
-        self.LoginUserLabel.setText(QCoreApplication.translate("MainWindow", u"TextLabel", None))
+        self.LoginUserLabel.setText("")
         self.label_4.setText("")
         self.label_5.setText("")
         self.label_6.setText("")

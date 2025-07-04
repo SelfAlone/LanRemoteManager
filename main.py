@@ -5,10 +5,14 @@ from pathlib import Path
 
 import ServiceInstallAndRun as Service
 import GetClientInfo
+from qt_material import apply_stylesheet
 from main_ui import Ui_MainWindow
 from EditDialog_ui import Ui_EditDialog
-from PySide6.QtWidgets import QApplication, QMainWindow, QLabel, QTableWidgetItem, QDialog, QMessageBox
+from EditTreeWidgetItem_ui import Ui_Dialog
+from PySide6.QtWidgets import QApplication, QMainWindow, QLabel, QTableWidgetItem, QDialog, QMessageBox, \
+    QListWidgetItem, QTreeWidgetItem, QMenu, QTreeWidget
 from PySide6.QtCore import QTimer, QDateTime, Qt, QThread, Signal, Slot, QProcess
+from PySide6.QtGui import QIcon, QFont, QAction
 
 
 class DatabaseWorker(QThread):
@@ -32,7 +36,7 @@ class DatabaseWorker(QThread):
             try:
                 # 建立数据库连接
                 self.connection = pymssql.connect(
-                    server="192.168.23.236",
+                    server="192.168.23.232",
                     port=1433,
                     database="LanRemoteMaster",
                     user="sa",
@@ -194,11 +198,90 @@ class EditDialog(QDialog, Ui_EditDialog):
         self.clientRecordTable.item(self.clientRecordTable.currentRow(), 6).setText(new_record[3])
 
 
+class EditTreeWidgetItemDialog(QDialog, Ui_Dialog):
+    creatItem = Signal(int)
+
+    def __init__(self, edit_type, tree_widget, item):
+        super(EditTreeWidgetItemDialog, self).__init__()
+        self.edit_type = edit_type
+        self.treeWidget = tree_widget
+        self.current_item = item
+        if edit_type == "folder":
+            self.setupEditFolderUi(self)
+            self.buttonBox.accepted.connect(self.creat_folder_item)
+            self.buttonBox.rejected.connect(self.close)
+            return
+
+        if edit_type == "session":
+            self.setupEditSessionUi(self)
+            self.toolButton.clicked.connect(lambda: self.switch_page(0, self.stackedWidget.currentIndex()))
+            self.toolButton_2.clicked.connect(lambda: self.switch_page(1, self.stackedWidget.currentIndex()))
+            self.buttonBox.accepted.connect(self.creat_session_item)
+            self.buttonBox.rejected.connect(self.close)
+            return
+
+    def creat_folder_item(self):
+        parent = self.current_item
+        text = self.lineEdit.text()
+
+        if not text:
+            QMessageBox.information(self, "信息", "文件夹名不能为空!", QMessageBox.Ok)
+            return
+
+        item = SessionTreeItem("folder", text)
+        if parent:
+            parent.addChild(item)
+        else:
+            self.treeWidget.addTopLevelItem(item)
+
+        self.creatItem.emit(1)
+        # self.save_tree_widget(".\\treeStructure.json")
+        self.lineEdit.clear()
+
+    def creat_session_item(self):
+        parent = self.current_item
+        current_index = self.stackedWidget.currentIndex()
+        item_attributes = {}
+
+        if current_index == 0:
+            item_attributes["host"] = self.lineEdit.text().strip()
+            item_attributes["password"] = self.lineEdit_2.text().strip()
+            item_attributes["port"] = self.spinBox.value()
+            # item_attributes["type"] = self.stackedWidget.widget(current_index).objectName()
+
+        if not item_attributes["host"] or not item_attributes["password"]:
+            QMessageBox.information(self, "信息", "请填写完整信息!", QMessageBox.Ok)
+            return
+
+        item = SessionTreeItem("session", item_attributes["host"], item_attributes)
+        if parent:
+            parent.addChild(item)
+        else:
+            self.treeWidget.addTopLevelItem(item)
+
+        self.creatItem.emit(1)
+        # self.save_tree_widget(".\\treeStructure.json")
+        self.lineEdit.clear()
+        self.lineEdit_2.clear()
+
+    def switch_page(self, target_index, page_index):
+        if target_index == 0:
+            self.toolButton.setStyleSheet("text-decoration: underline;")
+            self.toolButton_2.setStyleSheet("")
+        else:
+            self.toolButton_2.setStyleSheet("text-decoration: underline;")
+            self.toolButton.setStyleSheet("")
+
+        if target_index != page_index:
+            self.stackedWidget.setCurrentIndex(target_index)
+
+
 class FuncQLabel(QLabel):
-    def __init__(self, table, db):
+    def __init__(self, table, db, his_list):
         super().__init__()
         self.ClientRecordTable = table
         self.db_worker = db
+        self.listWidget = his_list
         self.setText(
             "<a href='Link'><font color=blue>连接</font></a> | <a href='Edit'><font color=blue>编辑</font></a>")
         self.setAlignment(Qt.AlignCenter)
@@ -218,16 +301,185 @@ class FuncQLabel(QLabel):
             vnc_process.setProgram(vnc_path)
             vnc_process.setArguments(args)
             vnc_process.startDetached()
+
+            self.insert_history_record(ip)  # 向历史列表添加连接记录
+            return
         if key == "Edit":
             edit_dialog = EditDialog(self.ClientRecordTable, self.db_worker)  # 传入主窗口表格控件与数据库工作线程
             edit_dialog.show()
             edit_dialog.exec()
+            return
+
+    def insert_history_record(self, ip):
+        if self.listWidget.count() < 16:
+            self.listWidget.insertItem(0, HisListWidgetItem(ip))
+            return
+        if self.listWidget.count() == 16:
+            self.listWidget.insertItem(0, HisListWidgetItem(ip))
+            last_item = self.listWidget.takeItem(self.listWidget.count() - 1)  # 移除历史连接记录列表最后一行
+            del last_item  # 显式删除
+            return
+
+
+class HisListWidgetItem(QListWidgetItem):
+    def __init__(self, text):
+        super().__init__()
+        icon = QIcon(QIcon.fromTheme(QIcon.ThemeIcon.Computer))
+        font = QFont()
+        font.setPointSize(10)
+        self.setFont(font)
+        self.setIcon(icon)
+        self.setText(text)
+
+
+class SessionTreeItem(QTreeWidgetItem):
+    def __init__(self, item_type, text, item_attribute=None):
+        super().__init__()
+        self.item_type = item_type
+        if item_type == "folder":
+            icon = QIcon(QIcon.fromTheme(QIcon.ThemeIcon.FolderOpen))
+            self.setIcon(0, icon)
+            self.setText(0, text)
+            return
+        if item_type == "session":
+            icon = QIcon(QIcon.fromTheme(QIcon.ThemeIcon.InsertLink))
+            self.attribute = item_attribute
+            self.setIcon(0, icon)
+            self.setText(0, text)
+            self.setToolTip(0,
+                            f"Host: {item_attribute['host']}\n"
+                            f"Port: {item_attribute['port']}")
+            return
+
+    def get_item_type(self):
+        return self.item_type
+
+    def get_item_attribute(self):
+        return self.attribute
+
+
+class TreeWidgetContextMenu(QMenu):
+    def __init__(self, item, tree_widget):
+        super().__init__()
+        self.treeWidget = tree_widget
+        font = QFont()
+        font.setPointSize(10)
+
+        if item is None:
+            new_folder = QAction(QIcon.fromTheme("folder-new"), "新建文件夹", self)
+            new_folder.triggered.connect(lambda: self.create_new_folder(item))
+            new_folder.setFont(font)
+
+            new_session = QAction(QIcon.fromTheme("list-add"), "新建会话", self)
+            new_session.triggered.connect(lambda: self.create_new_session(item))
+            self.addAction(new_folder)
+            self.addAction(new_session)
+            return
+
+        if hasattr(item, 'get_item_type'):
+            item_type = item.get_item_type()
+
+            if item_type == "folder":
+                new_folder = QAction(QIcon.fromTheme("folder-new"), "新建文件夹", self)
+                new_folder.triggered.connect(lambda: self.create_new_folder(item))
+                new_folder.setFont(font)
+
+                new_session = QAction(QIcon.fromTheme("list-add"), "新建会话", self)
+                new_session.triggered.connect(lambda: self.create_new_session(item))
+
+                edit_folder = QAction(QIcon.fromTheme("edit-redo"), "编辑会话夹", self)
+                delete_folder = QAction(QIcon.fromTheme("edit-delete"), "删除会话夹", self)
+                delete_folder.triggered.connect(lambda: self.delete_item(item))
+
+                self.addAction(new_folder)
+                self.addAction(new_session)
+                self.addAction(edit_folder)
+                self.addAction(delete_folder)
+                return
+
+            if item_type == "session":
+                edit_session = QAction(QIcon.fromTheme("edit-redo"), "编辑会话", self)
+                delete_session = QAction(QIcon.fromTheme("edit-delete"), "删除会话", self)
+                delete_session.triggered.connect(lambda: self.delete_item(item))
+
+                self.addAction(edit_session)
+                self.addAction(delete_session)
+                return
+
+        # 默认情况（如未知类型）
+        default_action = QAction("默认操作", self)
+        self.addAction(default_action)
+
+    def has_children(self, item):
+        """判断是否有子项（封装）"""
+        return item.childCount() > 0
+
+    def create_new_folder(self, parent=None):
+        edit_dialog = EditTreeWidgetItemDialog("folder", self.treeWidget, parent)
+        edit_dialog.creatItem.connect(lambda: self.save_tree_widget(".\\treeStructure.json"))
+        edit_dialog.exec()
+        return
+
+    def create_new_session(self, parent=None):
+        edit_dialog = EditTreeWidgetItemDialog("session", self.treeWidget, parent)
+        edit_dialog.creatItem.connect(lambda: self.save_tree_widget(".\\treeStructure.json"))
+        edit_dialog.exec()
+        return
+
+    def edit_folder(self):
+        pass
+
+    def delete_item(self, item):
+        """删除项目及其所有子项"""
+        if not item:
+            return
+
+        # 如果是顶层项目，从顶层删除
+        if item.parent() is None:
+            index = self.treeWidget.indexOfTopLevelItem(item)
+            self.treeWidget.takeTopLevelItem(index)
+        else:
+            parent = item.parent()
+            parent.removeChild(item)
+
+        self.save_tree_widget(".\\treeStructure.json")
+
+    def edit_session(self):
+        pass
+
+    def save_tree_widget(self, file_path):
+        def serialize_item(item):
+            if item.get_item_type() == "folder":
+                item_data = {
+                    "text": item.text(0),
+                    "type": item.get_item_type(),
+                    "children": []
+                }
+            else:
+                item_data = {
+                    "text": item.text(0),
+                    "type": item.get_item_type(),
+                    "data": item.get_item_attribute()
+                }
+            for index in range(item.childCount()):
+                child = item.child(index)
+                item_data["children"].append(serialize_item(child))
+            return item_data
+
+        root_data = []
+        for i in range(self.treeWidget.topLevelItemCount()):
+            root = self.treeWidget.topLevelItem(i)
+            root_data.append(serialize_item(root))
+
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(root_data, f, ensure_ascii=False, indent=2)
 
 
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
         super(MainWindow, self).__init__()
         self.setupUi(self)
+        self.load_tree_widget(".\\treeStructure.json")
         self.db_worker = None
         self.service_worker = None
 
@@ -260,11 +512,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.display_client_info()
         self.send_insert_to_worker()
 
+        self.treeWidget.customContextMenuRequested.connect(self.show_context_menu)
         self.actionoff.triggered.connect(self.db_worker.stop)
         self.pushButton.clicked.connect(self.send_query_to_worker)
         self.lineEdit.returnPressed.connect(self.send_query_to_worker)
-        self.ClientRecordTable.itemClicked.connect(lambda x: self.statusbar.showMessage(
-            f"坐标({self.ClientRecordTable.row(x)},{self.ClientRecordTable.column(x)})", 2000))
+        # self.ClientRecordTable.itemClicked.connect(lambda x: self.statusbar.showMessage(
+        #     f"坐标({self.ClientRecordTable.row(x)},{self.ClientRecordTable.column(x)})", 2000))
+        self.listWidget.itemDoubleClicked.connect(self.item_double_clicked)
+        self.treeWidget.itemDoubleClicked.connect(self.item_double_clicked)
 
         # 使用 QTimer.singleShot 延迟启动线程，确保 UI 已渲染
         QTimer.singleShot(0, self.service_install)
@@ -331,6 +586,21 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             ]
             self.db_worker.send_insert(insert_sentence, params)
 
+    def send_query_to_worker(self):
+        query_str = [self.lineEdit.text()] * 7
+        if query_str[0]:
+            query_sentence = ("SELECT Name, LoginUserName, ComputerName, ComputerIP, "
+                              "ComputerMAC, StartTime, Tab FROM ComputerList "
+                              f"WHERE Name LIKE %s or LoginUserName LIKE %s "
+                              f"or ComputerName LIKE %s or ComputerIP LIKE %s "
+                              f"or ComputerMAC LIKE %s or StartTime LIKE %s or Tab LIKE %s")
+            self.lineEdit.clear()
+            self.db_worker.send_query(query_sentence, query_str)  # 发送查询请求
+        else:
+            query_sentence = ("SELECT Name, LoginUserName, ComputerName, ComputerIP, "
+                              "ComputerMAC, StartTime, Tab FROM ComputerList")
+            self.db_worker.send_query(query_sentence)
+
     def compare_and_save_state(self, new_data):
         path = Path(".\\client_info.json")
 
@@ -363,20 +633,40 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 json.dump(new_data, f, ensure_ascii=False, indent=4)
             return True
 
-    def send_query_to_worker(self):
-        query_str = [self.lineEdit.text()] * 7
-        if query_str[0]:
-            query_sentence = ("SELECT Name, LoginUserName, ComputerName, ComputerIP, "
-                              "ComputerMAC, StartTime, Tab FROM ComputerList "
-                              f"WHERE Name LIKE %s or LoginUserName LIKE %s "
-                              f"or ComputerName LIKE %s or ComputerIP LIKE %s "
-                              f"or ComputerMAC LIKE %s or StartTime LIKE %s or Tab LIKE %s")
-            self.lineEdit.clear()
-            self.db_worker.send_query(query_sentence, query_str)  # 发送查询请求
-        else:
-            query_sentence = ("SELECT Name, LoginUserName, ComputerName, ComputerIP, "
-                              "ComputerMAC, StartTime, Tab FROM ComputerList")
-            self.db_worker.send_query(query_sentence)
+    def load_tree_widget(self, file_path):
+        def deserialize_item(parent, item_data):
+            if item_data["type"] == "folder":
+                item_text = item_data["text"]
+                item_type = item_data["type"]
+                item = SessionTreeItem(item_type, item_text)
+
+                if isinstance(parent, QTreeWidget):
+                    parent.addTopLevelItem(item)
+                else:
+                    parent.addChild(item)
+
+                for child_data in item_data.get("children", []):
+                    deserialize_item(item, child_data)
+
+            if item_data["type"] == "session":
+                item_text = item_data["text"]
+                item_type = item_data["type"]
+                item_data = item_data["data"]
+                item = SessionTreeItem(item_type, item_text, item_data)
+
+                if isinstance(parent, QTreeWidget):
+                    parent.addTopLevelItem(item)
+                else:
+                    parent.addChild(item)
+
+        self.treeWidget.clear()
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            for root_data in data:
+                deserialize_item(self.treeWidget, root_data)
+        except FileNotFoundError:
+            pass
 
     def update_table(self, results):
         """更新表格数据"""
@@ -384,8 +674,44 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         for row, data in enumerate(results):
             for col, value in enumerate(data):
                 self.ClientRecordTable.setItem(row, col, QTableWidgetItem(value))
-            self.ClientRecordTable.setCellWidget(row, 7, FuncQLabel(self.ClientRecordTable, self.db_worker))  # 添加自定义控件
+            self.ClientRecordTable.setCellWidget(row, 7,
+                                                 FuncQLabel(self.ClientRecordTable, self.db_worker,
+                                                            self.listWidget))  # 添加自定义控件
         self.ClientRecordTable.resizeColumnsToContents()  # 根据内容自适应列宽
+
+    def item_double_clicked(self, item):
+        vnc_process = QProcess()
+        vnc_path = r".\x64\vncviewer.exe"
+        args = []
+
+        if isinstance(item, HisListWidgetItem):
+            ip = item.text()
+            args = [
+                f"{ip}",
+                "-password",
+                "111111"
+            ]
+        if isinstance(item, SessionTreeItem):
+            if item.item_type == "folder":
+                return
+
+            host = item.attribute["host"] + ":" + str(item.attribute["port"])
+            password = item.attribute["password"]
+            args = [
+                f"{host}",
+                "-password",
+                f"{password}"
+            ]
+
+        vnc_process.setProgram(vnc_path)
+        vnc_process.setArguments(args)
+        vnc_process.startDetached()
+
+    def show_context_menu(self, item_point):
+        item = self.treeWidget.itemAt(item_point)
+        menu = TreeWidgetContextMenu(item, self.treeWidget)
+        menu.exec(self.treeWidget.viewport().mapToGlobal(item_point))
+        # self.tree_context_menu.exec(QCursor.pos())  # 显示菜单
 
     def show_message(self, msg):
         self.statusbar.showMessage(f"{msg}")
@@ -396,5 +722,6 @@ if __name__ == '__main__':
     if app is None:
         app = QApplication(sys.argv)
     window = MainWindow()
+    apply_stylesheet(app, theme="light_blue.xml", invert_secondary=True)
     window.show()
     sys.exit(app.exec())
