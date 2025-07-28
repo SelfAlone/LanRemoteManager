@@ -1,0 +1,44 @@
+[
+  {
+    "text": "分组",
+    "type": "folder",
+    "children": [
+      {
+        "text": "192.168.2.209",
+        "type": "session",
+        "data": {
+          "host": "192.168.2.209",
+          "password": "111222",
+          "port": 5900,
+          "type": "session_vnc"
+        }
+      },
+      {
+        "text": "分组1",
+        "type": "folder",
+        "children": [
+          {
+            "text": "127.0.0.1",
+            "type": "session",
+            "data": {
+              "host": "127.0.0.1",
+              "password": "q1`",
+              "port": 5900,
+              "type": "session_vnc"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "text": "192.169.1.1",
+    "type": "session",
+    "data": {
+      "host": "192.169.1.1",
+      "password": "111111",
+      "port": 5900,
+      "type": "session_vnc"
+    }
+  }
+]
